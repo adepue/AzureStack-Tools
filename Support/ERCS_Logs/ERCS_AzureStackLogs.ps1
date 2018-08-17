@@ -40,16 +40,12 @@
 	Specifies if script is running on Azure Stack machine such as Azure Stack Development Kit deployment or DVM.
 	Yes
 	No
-.PARAMETER StampTimeZone
-	Specifies timezone id for Azure Stack stamp. Format must be in one of the 2 formats:
-	(Get-TimeZone -Name "US Eastern*").id
-	"Pacific Standard Time"
 .PARAMETER IncompleteDeployment
 	Specifies if Azure Stack Deployment is incomplete. Only for use in Azure Stack Development Kit deployment or DVM
 	Yes
 	No
 .EXAMPLE
- .\ERCS_AzureStackLogs.ps1 -FromDate (get-date).AddHours(-4) -ToDate (get-date) -FilterByRole VirtualMachines,BareMetal -ErcsName AzS-ERCS01 -AzSCredentials (Get-Credential -Message "Azure Stack credentials") -ShareCred (get-credential -Message "Local share credentials" -UserName $env:USERNAME) -InStamp No -StampTimeZone "Pacific Standard Time" -IncompleteDeployment No
+ .\ERCS_AzureStackLogs.ps1 -FromDate (get-date).AddHours(-4) -ToDate (get-date) -FilterByRole VirtualMachines,BareMetal -ErcsName AzS-ERCS01 -AzSCredentials (Get-Credential -Message "Azure Stack credentials") -ShareCred (get-credential -Message "Local share credentials" -UserName $env:USERNAME) -InStamp No -IncompleteDeployment No
 #>
 
 Param(
@@ -58,8 +54,6 @@ Param(
     [DateTime] $FromDate,
 	[Parameter(Mandatory=$false,HelpMessage="Valid formats are: in 'MM/DD/YYYY' or 'MM/DD/YYYY HH:MM'")]
     [DateTime] $ToDate,
-	[Parameter(Mandatory=$false,HelpMessage="Valid formats are: in '(Get-TimeZone -Name 'US Eastern*').id' or 'Pacific Standard Time'")]
-    [String] $StampTimeZone,
 	[Parameter(Mandatory=$false,HelpMessage="Valid choices are: Service Fabric, Storage, Networking, Identity, Patch & Update, Compute, Backup")]
     [ValidateSet("Service Fabric", "Storage", "Networking", "Identity", "Patch & Update", "Compute", "Backup")]
     [string] $Scenario,
@@ -272,7 +266,6 @@ If(!($IP))
 	$FoundJSONFile = Get-Content -Raw -Path "$($Env:ProgramData)\AzureStackStampInformation.json" | ConvertFrom-Json
 	[string]$FoundDomainFQDN = $FoundJSONFile.DomainFQDN
 	[array]$ERCSIPS = $FoundJSONFile.EmergencyConsoleIPAddresses
-	$StampTimeZone = $FoundJSONFile.Timezone
 	$FoundSelERCSIP  = $FoundJSONFile.EmergencyConsoleIPAddresses | Out-GridView -Title "Please Select Emergency Console IP Address" -PassThru
 	$IP = $FoundSelERCSIP
 	}
@@ -284,7 +277,6 @@ If(!($IP))
 	    $FoundJSONFile = Get-Content -Raw -Path "$($env:SystemDrive)\CloudDeployment\Logs\AzureStackStampInformation.json" | ConvertFrom-Json
 	    [string]$FoundDomainFQDN = $FoundJSONFile.DomainFQDN
 	    [array]$ERCSIPS = $FoundJSONFile.EmergencyConsoleIPAddresses
-	    $StampTimeZone = $FoundJSONFile.Timezone
 	    $FoundSelERCSIP  = $FoundJSONFile.EmergencyConsoleIPAddresses | Out-GridView -Title "Please Select Emergency Console IP Address" -PassThru
 	    $IP = $FoundSelERCSIP
         }
@@ -374,7 +366,6 @@ if(!($IP))
 					$JSONFile | ConvertTo-Json | Out-File -FilePath "$($Env:ProgramData)\AzureStackStampInformation.json" -Force
 					[string]$FoundDomainFQDN = $JSONFile.DomainFQDN
 					[array]$ERCSIPS = $JSONFile.EmergencyConsoleIPAddresses
-					$StampTimeZone = $JSONFile.Timezone
 	                $selERCSIP = $ERCSIPS | Out-GridView -Title "Please Select Emergency Console IPAddress" -PassThru
 	                $IP = $selERCSIP
                     }
@@ -493,19 +484,6 @@ if (!($InStamp))
 	{
 	Write-Host "`n `t[INFO] Using Azure Stack Development Kit or DVM" -ForegroundColor Green
 	$CheckADSK = 1
-	}
-}
-
-#Get Stamp Timezone
-If (!($StampTimeZone))
-{
-$SelCurrentTimeZone = [system.timezoneinfo]::GetSystemTimeZones() | Out-GridView -PassThru -Title "Select AzureStack Stamp installed timezone"
-[String]$StampTimeZone = $SelCurrentTimeZone.Id
-	If ($StampTimeZone -eq $null)
-	{
-	Write-Host "`n Press any key to continue ...`n"
-	$x = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-	exit
 	}
 }
 
@@ -757,8 +735,7 @@ if($IP)
 	  [datetime]$DateTime
 	)  
 	{
-		$strCurrentTimeZone = $StampTimeZone
-		$ToTimeZoneObj  = [system.timezoneinfo]::GetSystemTimeZones() | Where-Object {$_.id -eq $strCurrentTimeZone}
+		$ToTimeZoneObj  = [system.timezoneinfo]::Utc
 		$TargetZoneTime = [system.timezoneinfo]::ConvertTime($datetime, $ToTimeZoneObj) 
 		$TargetZoneTime
 	}
